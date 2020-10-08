@@ -10,6 +10,9 @@ services:
       - "3000:3000"
   collector:
     build: collector
+    environment:
+      - API_URL=${API_URL}
+      - WS_URL=${WS_URL}
   influxdb:
     image: influxdb:latest
     container_name: influxdb
@@ -18,4 +21,10 @@ services:
       - "8086:8086"
       - "8090:8090"
     env_file:
-      - "env.influxdb"  
+      - "env.influxdb"
+  mongo:
+    image: mongo
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: password123
