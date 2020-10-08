@@ -7,8 +7,10 @@ import pymongo
 API_URL = os.environ['API_URL']
 WS_URL = os.environ['WS_URL']
 
-client = pymongo.MongoClient("localhost", 27017, username="root", password="password123")
-
+client = pymongo.MongoClient(host="localhost",
+                             port=27017,
+                             username="root",
+                             password="password123")
 db = client.vega
 
 
@@ -295,11 +297,11 @@ def sub_market_depth(ws):
 
 def handle_market(market):
     if market.get("market") and market.get("market")["id"]:
-        saved_market = db.market.find_one({"market.id": market["market"]["id"]})
+        saved_market = db.markets.find_one({"market.id": market["market"]["id"]})
         if not saved_market:
-            db.market.insert_one(market)
+            db.markets.insert_one(market)
         else:
-            db.market.update({"_id": saved_market["_id"]}, {"$set": market})
+            db.markets.update({"_id": saved_market["_id"]}, {"$set": market})
 
 
 def on_message(ws, message):
