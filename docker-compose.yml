@@ -1,9 +1,13 @@
 version: "3.3"
 services:
-  web:
+  api:
     build: api
     ports:
       - "5000:5000"
+  web:
+    build: web-ui
+    ports:
+      - "3000:3000"
   influxdb:
     image: influxdb:latest
     container_name: influxdb
