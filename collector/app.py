@@ -2,15 +2,23 @@ import websocket
 import json
 import requests
 import os
+import pymongo
 
 API_URL = os.environ['API_URL']
 WS_URL = os.environ['WS_URL']
 
+client = pymongo.MongoClient("localhost", 27017, username="root", password="password123")
+
+db = client.vega
+
+
 def get_markets():
     return requests.get(f"{API_URL}/markets").json()["markets"]
 
+
 def get_parties():
     return requests.get(f"{API_URL}/parties").json()["parties"]
+
 
 def get_positions_query(party_id):
     return '''
@@ -43,13 +51,13 @@ def get_positions_query(party_id):
         }
     '''
 
+
 def get_market_data_query(market_id):
     return '''
         subscription {
             marketData(marketId: "''' + market_id + '''") {
                 market {
                     id
-                    name
                     tradableInstrument {
                         instrument {
                             id
@@ -81,6 +89,7 @@ def get_market_data_query(market_id):
             }
         }
     '''
+
 
 def get_orders_query(party_id, market_id):
     orders_query = '''
@@ -126,6 +135,7 @@ def get_orders_query(party_id, market_id):
         }
     '''
 
+
 def get_market_depth_query(market_id):
     return '''
         subscription {
@@ -147,6 +157,7 @@ def get_market_depth_query(market_id):
             }
         }
     '''
+
 
 def get_margins_query(party_id, market_id):
     return '''
@@ -171,6 +182,7 @@ def get_margins_query(party_id, market_id):
             }
         }
     '''
+
 
 def get_trades_query(party_id, market_id):
     return '''
@@ -213,10 +225,12 @@ def get_trades_query(party_id, market_id):
         }
     '''
 
+
 def sub_init(ws):
     ws.send(json.dumps({
         'type': 'connection_init'
     }))
+
 
 def sub_markets(ws):
     markets = get_markets()
@@ -225,18 +239,20 @@ def sub_markets(ws):
         ws.send(json.dumps({
             'id': f'market_{market_id}',
             'type': 'start',
-            'payload': { 'query': get_market_data_query(market_id) }
-        })) 
+            'payload': {'query': get_market_data_query(market_id)}
+        }))
+
 
 def sub_positions(ws):
     parties = get_parties()
     for party in parties:
         party_id = party['id']
         ws.send(json.dumps({
-            'id': f'positions_party_{party_id}',
+            'id': f'position_party_{party_id}',
             'type': 'start',
-            'payload': { 'query': get_positions_query(party_id) }
-        })) 
+            'payload': {'query': get_positions_query(party_id)}
+        }))
+
 
 def sub_trades(ws):
     parties = get_parties()
@@ -248,8 +264,9 @@ def sub_trades(ws):
             ws.send(json.dumps({
                 'id': f'trade_party_{party_id}_market_{market_id}',
                 'type': 'start',
-                'payload': { 'query': get_trades_query(party_id, market_id) }
-            })) 
+                'payload': {'query': get_trades_query(party_id, market_id)}
+            }))
+
 
 def sub_margins(ws):
     parties = get_parties()
@@ -261,8 +278,9 @@ def sub_margins(ws):
             ws.send(json.dumps({
                 'id': f'margin_party_{party_id}_market_{market_id}',
                 'type': 'start',
-                'payload': { 'query': get_margins_query(party_id, market_id) }
-            })) 
+                'payload': {'query': get_margins_query(party_id, market_id)}
+            }))
+
 
 def sub_market_depth(ws):
     markets = get_markets()
@@ -271,27 +289,49 @@ def sub_market_depth(ws):
         ws.send(json.dumps({
             'id': f'market_depth_{market_id}',
             'type': 'start',
-            'payload': { 'query': get_market_depth_query(market_id) }
-        })) 
+            'payload': {'query': get_market_depth_query(market_id)}
+        }))
+
+
+def handle_market(market):
+    if market.get("market") and market.get("market")["id"]:
+        saved_market = db.market.find_one({"market.id": market["market"]["id"]})
+        if not saved_market:
+            db.market.insert_one(market)
+        else:
+            db.market.update({"_id": saved_market["_id"]}, {"$set": market})
+
 
 def on_message(ws, message):
-    # TODO - parse message and store data 
-    # print(message)
-    pass
+    json_msg = json.loads(message)
+    if json_msg['id'].startswith('position'):
+        print(json_msg)
+    elif json_msg['id'].startswith('market_depth'):
+        print(json_msg)
+    elif json_msg['id'].startswith('margin'):
+        print(json_msg)
+    elif json_msg['id'].startswith('trade'):
+        print(json_msg)
+    elif json_msg['id'].startswith('market'):
+        handle_market(json_msg['payload']['data']['marketData'])
+
 
 def on_error(ws, error):
     print(error)
 
+
 def on_close(ws):
     print('### closed ###')
+
 
 def on_open(ws):
     sub_init(ws)
     sub_markets(ws)
-    sub_positions(ws)
-    sub_margins(ws)
-    sub_market_depth(ws)
-    sub_trades(ws)
+    # sub_positions(ws)
+    # sub_margins(ws)
+    # sub_market_depth(ws)
+    # sub_trades(ws)
+
 
 def connect():
     ws = websocket.WebSocketApp(f"{WS_URL}/query",
@@ -300,6 +340,7 @@ def connect():
                                 on_close=on_close)
     ws.on_open = on_open
     ws.run_forever()
+
 
 if __name__ == '__main__':
     connect()
