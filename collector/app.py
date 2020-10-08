@@ -226,7 +226,7 @@ def sub_markets(ws):
             'id': f'market_{market_id}',
             'type': 'start',
             'payload': { 'query': get_market_data_query(market_id) }
-        }))
+        })) 
 
 def sub_positions(ws):
     parties = get_parties()
@@ -236,7 +236,7 @@ def sub_positions(ws):
             'id': f'positions_party_{party_id}',
             'type': 'start',
             'payload': { 'query': get_positions_query(party_id) }
-        }))
+        })) 
 
 def sub_trades(ws):
     parties = get_parties()
@@ -249,7 +249,7 @@ def sub_trades(ws):
                 'id': f'trade_party_{party_id}_market_{market_id}',
                 'type': 'start',
                 'payload': { 'query': get_trades_query(party_id, market_id) }
-            }))
+            })) 
 
 def sub_margins(ws):
     parties = get_parties()
@@ -262,7 +262,7 @@ def sub_margins(ws):
                 'id': f'margin_party_{party_id}_market_{market_id}',
                 'type': 'start',
                 'payload': { 'query': get_margins_query(party_id, market_id) }
-            }))
+            })) 
 
 def sub_market_depth(ws):
     markets = get_markets()
@@ -272,10 +272,11 @@ def sub_market_depth(ws):
             'id': f'market_depth_{market_id}',
             'type': 'start',
             'payload': { 'query': get_market_depth_query(market_id) }
-        }))
+        })) 
 
 def on_message(ws, message):
     # TODO - parse message and store data 
+    # print(message)
     pass
 
 def on_error(ws, error):
