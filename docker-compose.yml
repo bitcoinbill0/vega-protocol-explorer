@@ -8,6 +8,8 @@ services:
     build: web-ui
     ports:
       - "3000:3000"
+  collector:
+    build: collector
   influxdb:
     image: influxdb:latest
     container_name: influxdb
