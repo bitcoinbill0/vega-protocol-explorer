@@ -25,7 +25,8 @@ class App extends React.Component {
       longWinnerVol: 0,
       shortWinnerVol: 0,
       longLoserVol: 0,
-      shortLoserVol: 0
+      shortLoserVol: 0,
+      baseUri: "localhost"
     }
   }
   buildSentiment() {
@@ -51,7 +52,7 @@ class App extends React.Component {
   }
   fetchLeaderboard() {
     const activeMarket = this.state.markets.filter(market => market.active)[0];
-    fetch("http://localhost:5000/leaderboard?market_name=" + activeMarket.name + "&sort=DESC")
+    fetch("http://" + this.state.baseUri + ":5000/leaderboard?market_name=" + activeMarket.name + "&sort=DESC")
       .then(res => res.json())
       .then(
         (result) => {
@@ -66,7 +67,7 @@ class App extends React.Component {
   }
   fetchLoserboard() {
     const activeMarket = this.state.markets.filter(market => market.active)[0];
-    fetch("http://localhost:5000/leaderboard?market_name=" + activeMarket.name + "&sort=ASC")
+    fetch("http://" + this.state.baseUri + ":5000/leaderboard?market_name=" + activeMarket.name + "&sort=ASC")
       .then(res => res.json())
       .then(
         (result) => {
@@ -81,7 +82,7 @@ class App extends React.Component {
   }
   fetchOpenPositions() {
     const activeMarket = this.state.markets.filter(market => market.active)[0];
-    fetch("http://localhost:5000/open-positions?market_name=" + activeMarket.name + "&sort=DESC")
+    fetch("http://" + this.state.baseUri + ":5000/open-positions?market_name=" + activeMarket.name + "&sort=DESC")
       .then(res => res.json())
       .then(
         (result) => {
@@ -95,7 +96,7 @@ class App extends React.Component {
       );
   }
   fetchMarkets() {
-    fetch("http://localhost:5000/markets")
+    fetch("http://" + this.state.baseUri + ":5000/markets")
       .then(res => res.json())
       .then(
         (result) => {
