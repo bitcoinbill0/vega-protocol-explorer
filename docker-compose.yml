@@ -2,17 +2,32 @@ version: "3.3"
 services:
   api:
     build: api
+    environment:
+      - INFLUX_HOST=influxdb
+      - MONGO_HOST=mongo
     ports:
       - "5000:5000"
+    depends_on:
+      - mongo
+      - influxdb
   web:
     build: web-ui
     ports:
       - "3000:3000"
+    depends_on:
+      - collector
+      - api
   collector:
     build: collector
     environment:
+      - INFLUX_HOST=influxdb
+      - MONGO_HOST=mongo
       - API_URL=${API_URL}
       - WS_URL=${WS_URL}
+      - GQ_URL=${GQ_URL}
+    depends_on:
+      - mongo
+      - influxdb
   influxdb:
     image: influxdb:latest
     container_name: influxdb
