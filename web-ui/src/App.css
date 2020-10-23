@@ -42,6 +42,10 @@ table tr.alt {
   text-align:right;
 }
 
+.center {
+  text-align: center;
+}
+
 thead td {
   font-weight: 600;
 }
@@ -56,4 +60,51 @@ thead td {
 
 input[type="radio"], i {
   cursor: pointer;
+}
+
+.long-label {
+  background-color: #4aa165;
+  padding:3px 5px;
+  border-radius:2px;
+  color:#ffffff;
+  font-weight: bold;
+}
+
+.short-label {
+  background-color: #d16547;
+  padding:3px 5px;
+  border-radius:2px;
+  color:#ffffff;
+  font-weight: bold;
+}
+
+td a {
+  color:blue;
+}
+
+td a:visited, td a:active {
+  color:blue;
+}
+
+td a:hover {
+  color:blue;
+  text-decoration: none;
+}
+
+.flash-value-green {
+  animation: color-change-green 3s;
+}
+
+.flash-value-red {
+  animation: color-change-red 3s;
+}
+
+@keyframes color-change-green {
+  0% { color: #4aa165; font-weight: 600;}
+  100% { color: #000000; font-weight: 400; }
+}
+
+@keyframes color-change-red {
+  0% { color: #d16547; font-weight: 600; }
+  100% { color: #000000; font-weight: 400; }
 }

@@ -63,30 +63,49 @@ last_influx_updates = {}
 
 def update_parties():
     global last_influx_update
-    response = requests.post(GQ_URL, json=body)
+    response = None
+    try:
+        response = requests.post(GQ_URL, json=body)
+    except:
+        print('Error calling Vega API')
+    if not response:
+        return
     data = response.json()
     for party in data["data"]["parties"]:
-        saved_party = db.parties.find_one({
-            "id": party["id"]
-        })
+        saved_party = None
+        try:
+            saved_party = db.parties.find_one({
+                "id": party["id"]
+            })
+        except:
+            print('Error whilst reading from mongo')
         if not saved_party:
             if len(party["positions"]) > 0:
-                db.parties.insert_one(party)
+                try:
+                    db.parties.insert_one(party)
+                except:
+                    print('Error whilst writing to mongo')
         else:
             # TODO - don't need to store in influx more often than once per minute
             this_minute = datetime.datetime.now().minute
             if not last_influx_updates.get(party["id"]) or last_influx_updates.get(party["id"]) != this_minute:
-                influxdb_client.write_points([
-                    {
-                        "measurement": party["id"],
-                        "fields": {
-                            "party": json.dumps(party)
-                        },
-                        "time": datetime.datetime.now().isoformat()
-                    }
-                ])
-                last_influx_updates[party["id"]] = this_minute
-            db.parties.update({"_id": saved_party["_id"]}, {"$set": party})
+                try:
+                    influxdb_client.write_points([
+                        {
+                            "measurement": party["id"],
+                            "fields": {
+                                "party": json.dumps(party)
+                            },
+                            "time": datetime.datetime.now().isoformat()
+                        }
+                    ])
+                    last_influx_updates[party["id"]] = this_minute
+                except:
+                    print('Error whilst writing to influx')
+            try:
+                db.parties.update({"_id": saved_party["_id"]}, {"$set": party})
+            except:
+                print('Error whilst writing to mongo')
 
 while True:
     update_parties()

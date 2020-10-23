@@ -152,6 +152,18 @@ def get_sentiment():
     return jsonify(sentiment)
 
 
+@app.route('/liquidations', methods=['GET'])
+def get_liqs():
+    liqs = {}
+    market_name = request.args.get("market_name")
+    if not market_name:
+        return jsonify(liqs)
+    data = get_positions_by_market(market_name)
+    # TODO - loop over the positions and add in liquidation price
+    liqs['positions'] = data
+    return jsonify(liqs)
+
+
 @app.route('/markets', methods=['GET'])
 def get_markets():
     return jsonify(get_markets_arr())

@@ -9,7 +9,6 @@ import {
   HorizontalBarSeries
 } from 'react-vis';
 import ReactTooltip from 'react-tooltip';
-import MoreIcon from './more.png';
 
 class App extends React.Component {
   constructor(props) {
@@ -56,6 +55,16 @@ class App extends React.Component {
       .then(res => res.json())
       .then(
         (result) => {
+          if(this.state.leaderboard.length > 0) {
+            result.forEach((item, idx) => {
+              const position = this.state.leaderboard[idx].position;
+              item.position.lastOpenVolume = position.openVolume;
+              item.position.lastRealisedPNL = position.realisedPNL;
+              item.position.lastTotalPNL = position.totalPNL;
+              item.position.lastAverageEntryPrice = position.averageEntryPrice;
+              item.position.lastUnrealisedPNL = position.unrealisedPNL;
+            });
+          }
           this.setState({leaderboard: result}, () => {
             this.buildSentiment();
           });
@@ -71,6 +80,16 @@ class App extends React.Component {
       .then(res => res.json())
       .then(
         (result) => {
+          if(this.state.loserboard.length > 0) {
+            result.forEach((item, idx) => {
+              const position = this.state.loserboard[idx].position;
+              item.position.lastOpenVolume = position.openVolume;
+              item.position.lastRealisedPNL = position.realisedPNL;
+              item.position.lastTotalPNL = position.totalPNL;
+              item.position.lastAverageEntryPrice = position.averageEntryPrice;
+              item.position.lastUnrealisedPNL = position.unrealisedPNL;
+            });
+          }
           this.setState({loserboard: result}, () => {
             this.buildSentiment();
           });
@@ -86,6 +105,16 @@ class App extends React.Component {
       .then(res => res.json())
       .then(
         (result) => {
+          if(this.state.openPositions.length > 0) {
+            result.forEach((item, idx) => {
+              const position = this.state.openPositions[idx].position;
+              item.position.lastOpenVolume = position.openVolume;
+              item.position.lastRealisedPNL = position.realisedPNL;
+              item.position.lastTotalPNL = position.totalPNL;
+              item.position.lastAverageEntryPrice = position.averageEntryPrice;
+              item.position.lastUnrealisedPNL = position.unrealisedPNL;
+            });
+          }
           this.setState({openPositions: result}, () => {
             this.buildSentiment();
           });
@@ -96,24 +125,33 @@ class App extends React.Component {
       );
   }
   fetchMarkets() {
-    fetch("http://" + this.state.baseUri + ":5000/markets")
-      .then(res => res.json())
-      .then(
-        (result) => {
-          result[0].active = true;
-          this.setState({markets: result}, () => {
-            this.fetchLeaderboard();
-            this.fetchLoserboard();
-            this.fetchOpenPositions();
-          });
-        },
-        (error) => {
-          console.error(error);
-        }
-      );
+    if(this.state.markets.length === 0) {
+      fetch("http://" + this.state.baseUri + ":5000/markets")
+        .then(res => res.json())
+        .then(
+          (result) => {
+            result[0].active = true;
+            this.setState({markets: result}, () => {
+              this.fetchLeaderboard();
+              this.fetchLoserboard();
+              this.fetchOpenPositions();
+            });
+          },
+          (error) => {
+            console.error(error);
+          }
+        );
+    } else {
+      this.fetchLeaderboard();
+      this.fetchLoserboard();
+      this.fetchOpenPositions();
+    }
   }
   componentDidMount() {
-    this.fetchMarkets();
+    this.timer = setInterval(() => this.fetchMarkets(), 1000);
+  }
+  componentWillUnmount() {
+    this.timer = null;
   }
   selectMarket(name) {
     this.state.markets.forEach(market => {
@@ -128,6 +166,65 @@ class App extends React.Component {
   }
   onChangeTableType(event) {
     this.setState({tableType: event.target.value});
+  }
+  renderTableWithSentiment(longVol, shortVol, data, title) {
+    return (
+      <div>
+        <h2>Current Sentiment</h2>
+        <XYPlot width={900} height={160} margin={{bottom: 80, left: 60, right: 10, top: 20}}  stackBy="x" yType="ordinal">
+          <VerticalGridLines />
+          <HorizontalGridLines />
+          <XAxis tickTotal={5} tickFormat={v => {
+            if (v >= 1000000) {
+              return `${v/1000000}M`
+            } else if (v >= 1000) {
+              return `${v/1000}K`
+            }
+            return `${v}`
+          }} />
+          <YAxis />
+          <HorizontalBarSeries data={[{x: Math.round(longVol), y: 'Long'}]} color='#4aa165' />
+          <HorizontalBarSeries data={[{x: Math.round(shortVol), y: 'Short'}]} color='#d16547' />
+        </XYPlot>
+        <h2>{title}</h2>
+        <table width="100%" cellSpacing="0" cellPadding="0" border="0">
+          <thead>
+            <tr>
+              <td>Party</td>
+              <td className="center">Side</td>
+              <td className="right">Size</td>
+              <td className="right">Entry</td>
+              <td className="right">Net PNL</td>
+            </tr>
+          </thead>
+          <tbody>
+            {data.map(party => {
+              const averageEntryPrice = (party.position.averageEntryPrice) / (10 ** party.position.margins[0].asset.decimals);
+              const unrealisedPNL = (party.position.unrealisedPNL) / (10 ** party.position.margins[0].asset.decimals);
+              const totalPNL = (party.position.totalPNL) / (10 ** party.position.margins[0].asset.decimals);
+              const activeMarket = this.state.markets.filter(market => market.active)[0];
+              const PNL = title === "Largest Positions" ? unrealisedPNL : totalPNL;
+              return (
+                <tr>
+                  <td><a href={"/party/"+party.partyId} target="_blank" rel="noopener noreferrer">{party.partyId}</a></td>
+                  <td className={"center"}>{this.renderSide(party.position.openVolume)}</td>
+                  <td className={"right " + (party.position.openVolume > party.position.lastOpenVolume ? "flash-value-green" : party.position.openVolume < party.position.lastOpenVolume ? "flash-value-red" : "")}>{Math.abs(party.position.openVolume)}</td>
+                  <td className={"right"}>{averageEntryPrice.toFixed(activeMarket.name==="ETHUSD/DEC20" ? 2 : 4)}</td>
+                  <td className={"right " + (party.position.totalPNL > party.position.lastTotalPNL ? "flash-value-green" : party.position.totalPNL < party.position.lastTotalPNL ? "flash-value-red" : "")}>{PNL.toFixed(2)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+  renderSide(vol) {
+    if(vol > 0) {
+      return <span className="long-label">Long</span>
+    } else {
+      return <span className="short-label">Short</span>
+    }
   }
   render() {
     return (
@@ -165,146 +262,11 @@ class App extends React.Component {
         </div>
         <div className="table-holder">
          {this.state.tableType === "Leaderboard" ? (
-           <div>
-             <h2>Current Sentiment</h2>
-             <XYPlot width={900} height={160} margin={{bottom: 80, left: 60, right: 10, top: 20}}  stackBy="x" yType="ordinal">
-               <VerticalGridLines />
-               <HorizontalGridLines />
-               <XAxis tickTotal={5} tickFormat={v => {
-                 if (v >= 1000000) {
-                   return `${v/1000000}M`
-                 } else if (v >= 1000) {
-                   return `${v/1000}K`
-                 }
-                 return `${v}`
-               }} />
-               <YAxis />
-               <HorizontalBarSeries data={[{x: Math.round(this.state.longWinnerVol), y: 'Long'}]} color='#4aa165' />
-               <HorizontalBarSeries data={[{x: Math.round(this.state.shortWinnerVol), y: 'Short'}]} color='#d16547' />
-             </XYPlot>
-             <h2>Big Winners</h2>
-             <table width="100%" cellSpacing="0" cellPadding="0" border="0">
-               <thead>
-                 <tr>
-                   <td></td>
-                   <td>Party</td>
-                   <td className="right">RPNL</td>
-                   <td className="right">UPNL</td>
-                   <td className="right">Net PNL</td>
-                 </tr>
-               </thead>
-               <tbody>
-                 {this.state.leaderboard.map(party => {
-                   const realisedPNL = (party.position.realisedPNL) / (10 ** party.position.margins[0].asset.decimals);
-                   const unrealisedPNL = (party.position.unrealisedPNL) / (10 ** party.position.margins[0].asset.decimals);
-                   const totalPNL = (party.position.totalPNL) / (10 ** party.position.margins[0].asset.decimals);
-                   return (
-                     <tr>
-                       <td><a href={"/party/"+party.partyId} target="_blank" rel="noopener noreferrer"><img className="more-icon" src={MoreIcon} width="12" alt="Open" /></a></td>
-                       <td>{party.partyId}</td>
-                       <td className="right">{realisedPNL.toFixed(2)}</td>
-                       <td className="right">{unrealisedPNL.toFixed(2)}</td>
-                       <td className="right">{totalPNL.toFixed(2)}</td>
-                     </tr>
-                   );
-                 })}
-               </tbody>
-             </table>
-           </div>
+           this.renderTableWithSentiment(this.state.longWinnerVol, this.state.shortWinnerVol, this.state.leaderboard, 'Biggest Winners')
          ) : this.state.tableType === "OpenPositions" ? (
-           <div>
-             <h2>Current Sentiment</h2>
-             <XYPlot width={900} height={160} margin={{bottom: 80, left: 60, right: 10, top: 20}}  stackBy="x" yType="ordinal">
-               <VerticalGridLines />
-               <HorizontalGridLines />
-               <XAxis tickTotal={5} tickFormat={v => {
-                 if (v >= 1000000) {
-                   return `${v/1000000}M`
-                 } else if (v >= 1000) {
-                   return `${v/1000}K`
-                 }
-                 return `${v}`
-               }} />
-               <YAxis />
-               <HorizontalBarSeries data={[{x: Math.round(this.state.longPositionVol), y: 'Long'}]} color='#4aa165' />
-               <HorizontalBarSeries data={[{x: Math.round(this.state.shortPositionVol), y: 'Short'}]} color='#d16547' />
-             </XYPlot>
-             <h2>Largest Positions</h2>
-             <table width="100%" cellSpacing="0" cellPadding="0" border="0">
-               <thead>
-                 <tr>
-                   <td></td>
-                   <td>Party</td>
-                   <td className="right">Size</td>
-                   <td className="right">Entry</td>
-                   <td className="right">UPNL</td>
-                 </tr>
-               </thead>
-               <tbody>
-                 {this.state.openPositions.map(party => {
-                   const averageEntryPrice = (party.position.averageEntryPrice) / (10 ** party.position.margins[0].asset.decimals);
-                   const unrealisedPNL = (party.position.unrealisedPNL) / (10 ** party.position.margins[0].asset.decimals);
-                   const activeMarket = this.state.markets.filter(market => market.active)[0];
-                   return (
-                     <tr>
-                       <td><a href={"/party/"+party.partyId} target="_blank" rel="noopener noreferrer"><img className="more-icon" src={MoreIcon} width="12" alt="Open" /></a></td>
-                       <td>{party.partyId}</td>
-                       <td className="right">{party.position.openVolume}</td>
-                       <td className="right">{averageEntryPrice.toFixed(activeMarket.name==="ETHUSD/DEC20" ? 2 : 4)}</td>
-                       <td className="right">{unrealisedPNL.toFixed(2)}</td>
-                     </tr>
-                   );
-                 })}
-               </tbody>
-             </table>
-           </div>
+           this.renderTableWithSentiment(this.state.longPositionVol, this.state.shortPositionVol, this.state.openPositions, 'Largest Positions')
          ) : this.state.tableType === "Loserboard" ? (
-           <div>
-             <h2>Current Sentiment</h2>
-             <XYPlot width={900} height={160} margin={{bottom: 80, left: 60, right: 10, top: 20}}  stackBy="x" yType="ordinal">
-               <VerticalGridLines />
-               <HorizontalGridLines />
-               <XAxis tickTotal={5} tickFormat={v => {
-                 if (v >= 1000000) {
-                   return `${v/1000000}M`
-                 } else if (v >= 1000) {
-                   return `${v/1000}K`
-                 }
-                 return `${v}`
-               }} />
-               <YAxis />
-               <HorizontalBarSeries data={[{x: Math.round(this.state.longLoserVol), y: 'Long'}]} color='#4aa165' />
-               <HorizontalBarSeries data={[{x: Math.round(this.state.shortLoserVol), y: 'Short'}]} color='#d16547' />
-             </XYPlot>
-             <h2>Big Losers</h2>
-             <table width="100%" cellSpacing="0" cellPadding="0" border="0">
-               <thead>
-                 <tr>
-                   <td></td>
-                   <td>Party</td>
-                   <td className="right">RPNL</td>
-                   <td className="right">UPNL</td>
-                   <td className="right">Net PNL</td>
-                 </tr>
-               </thead>
-               <tbody>
-                 {this.state.loserboard.map(party => {
-                   const realisedPNL = (party.position.realisedPNL) / (10 ** party.position.margins[0].asset.decimals);
-                   const unrealisedPNL = (party.position.unrealisedPNL) / (10 ** party.position.margins[0].asset.decimals);
-                   const totalPNL = (party.position.totalPNL) / (10 ** party.position.margins[0].asset.decimals);
-                   return (
-                     <tr>
-                       <td><a href={"/party/"+party.partyId} target="_blank" rel="noopener noreferrer"><img className="more-icon" src={MoreIcon} width="12" alt="Open" /></a></td>
-                       <td>{party.partyId}</td>
-                       <td className="right">{realisedPNL.toFixed(2)}</td>
-                       <td className="right">{unrealisedPNL.toFixed(2)}</td>
-                       <td className="right">{totalPNL.toFixed(2)}</td>
-                     </tr>
-                   );
-                 })}
-               </tbody>
-             </table>
-           </div>
+           this.renderTableWithSentiment(this.state.longLoserVol, this.state.shortLoserVol, this.state.loserboard, 'Biggest Losers')
          ) : (
            <div>
             <h2>Liquidation Clusters</h2>
