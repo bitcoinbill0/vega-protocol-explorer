@@ -32,7 +32,9 @@ valid_markets = ["ETHUSD/DEC20", "ETHBTC/DEC20", "GBPUSD/DEC20"]
 
 @app.route('/')
 def index():
-    return "Hello, World!"
+    return jsonify({
+        'ok': True
+    })
 
 
 def get_markets_arr():
@@ -50,6 +52,7 @@ def get_positions_by_market(market_name):
     parties = list(db.parties.find())
     data = []
     for party in parties:
+        accounts = party["accounts"]
         for position in party["positions"]:
             if position["market"]["name"] == market_name:
                 position["openVolume"] = int(position["openVolume"])
@@ -57,6 +60,21 @@ def get_positions_by_market(market_name):
                 position["unrealisedPNL"] = int(position["unrealisedPNL"])
                 position["totalPNL"] = int(position["unrealisedPNL"]) + int(position["realisedPNL"])
                 position["averageEntryPrice"] = int(position["averageEntryPrice"])
+                position["market"]["data"]["markPrice"] = int(position["market"]["data"]["markPrice"])
+                position["margins"][0]["asset"]["totalSupply"] = int(position["margins"][0]["asset"]["totalSupply"])
+                position["margins"][0]["collateralReleaseLevel"] = int(position["margins"][0]["collateralReleaseLevel"])
+                position["margins"][0]["initialLevel"] = int(position["margins"][0]["initialLevel"])
+                position["margins"][0]["maintenanceLevel"] = int(position["margins"][0]["maintenanceLevel"])
+                position["margins"][0]["searchLevel"] = int(position["margins"][0]["searchLevel"])
+                accounts = list(filter(lambda a: a["asset"]["symbol"] == position["margins"][0]["asset"]["symbol"], accounts))
+                for account in accounts:
+                    account["balance"] = int(account["balance"])
+                margin_balance = list(map(lambda a: a["balance"], list(filter(lambda a: a["type"] == "Margin", accounts))))[0]
+                wallet_balance = list(map(lambda a: a["balance"], list(filter(lambda a: a["type"] == "General", accounts))))[0]
+                position["balance"] = {
+                    "margin": margin_balance,
+                    "wallet": wallet_balance
+                }
                 data.append({
                     "partyId": party["id"],
                     "position": position
@@ -129,38 +147,42 @@ def get_leaderboard_rpnl():
     return jsonify(data[from_idx:to_idx])
 
 
-@app.route('/sentiment', methods=['GET'])
-def get_sentiment():
-    sentiment = []
-    markets = get_markets_arr()
-    for market in markets:
-        positions = get_positions_by_market(market["name"])
-        short_positions = list(filter(lambda x: x["position"]["openVolume"] < 0, positions))
-        long_positions = list(filter(lambda x: x["position"]["openVolume"] > 0, positions))
-        # TODO - determine sentiment from positions
-        short_open_volume = sum(list(map(lambda x: x["position"]["openVolume"], short_positions)))
-        long_open_volume = sum(list(map(lambda x: x["position"]["openVolume"], long_positions)))
-        short_sum_product = sum(list(map(lambda x: x["position"]["openVolume"] * x["position"]["averageEntryPrice"], short_positions)))
-        long_sum_product = sum(list(map(lambda x: x["position"]["openVolume"] * x["position"]["averageEntryPrice"], long_positions)))
-        sentiment.append({
-            'longOpenVolume': long_open_volume,
-            'shortOpenVolume': short_open_volume,
-            'longAverageEntryPrice': round(long_sum_product / long_open_volume),
-            'shortAverageEntryPrice': round(short_sum_product / short_open_volume),
-            'market': market
-        })
-    return jsonify(sentiment)
-
-
 @app.route('/liquidations', methods=['GET'])
 def get_liqs():
     liqs = {}
     market_name = request.args.get("market_name")
+    depth = float(request.args.get("depth", "0.1"))
     if not market_name:
         return jsonify(liqs)
     data = get_positions_by_market(market_name)
-    # TODO - loop over the positions and add in liquidation price
-    liqs['positions'] = data
+    data = list(filter(lambda d: d["position"]["openVolume"] != 0, data))
+    markPrice = 0
+    decimals = 0
+    for item in data:
+        # liquidation price = mark price +/- (((margin balance - maintenance level) + balance of asset in main wallet) / position size))
+        markPrice = item["position"]["market"]["data"]["markPrice"]
+        decimals = item["position"]["margins"][0]["asset"]["decimals"]
+        marginBalance = item["position"]["balance"]["margin"]
+        walletBalance = item["position"]["balance"]["wallet"]
+        maintenanceLevel = item["position"]["margins"][0]["maintenanceLevel"]
+        openVolume = item["position"]["openVolume"]
+        liq_price = round(markPrice - (((marginBalance - maintenanceLevel) + walletBalance) / openVolume))
+        item["position"]["margins"][0]["liquidationLevel"] = liq_price
+    min_liq = markPrice * (1 - depth)
+    max_liq = markPrice * (1 + depth)
+    long_liquidations = sorted(list(map(lambda x: {"openVolume": x["position"]["openVolume"], "liquidationLevel": x["position"]["margins"][0]["liquidationLevel"]}, list(filter(lambda x: x["position"]["openVolume"] > 0 and min_liq < x["position"]["margins"][0]["liquidationLevel"] < max_liq and x["position"]["margins"][0]["liquidationLevel"] < markPrice, data)))), key=lambda k: k['liquidationLevel'], reverse=True)
+    short_liquidations = sorted(list(map(lambda x: {"openVolume": abs(x["position"]["openVolume"]), "liquidationLevel": x["position"]["margins"][0]["liquidationLevel"]}, list(filter(lambda x: x["position"]["openVolume"] < 0 and min_liq < x["position"]["margins"][0]["liquidationLevel"] < max_liq and x["position"]["margins"][0]["liquidationLevel"] > markPrice, data)))), key=lambda k: k['liquidationLevel'], reverse=False)
+    prev_liq = 0
+    for liq in long_liquidations:
+        liq["openVolume"] = prev_liq + liq["openVolume"]
+        prev_liq = liq["openVolume"]
+    prev_liq = 0
+    for liq in short_liquidations:
+        liq["openVolume"] = prev_liq + liq["openVolume"]
+        prev_liq = liq["openVolume"]
+    liqs["decimals"] = decimals
+    liqs["long"] = long_liquidations
+    liqs["short"] = short_liquidations
     return jsonify(liqs)
 
 

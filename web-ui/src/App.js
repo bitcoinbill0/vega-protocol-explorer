@@ -5,6 +5,7 @@ import {
   XAxis,
   YAxis,
   VerticalGridLines,
+  AreaSeries,
   HorizontalGridLines,
   HorizontalBarSeries
 } from 'react-vis';
@@ -25,7 +26,12 @@ class App extends React.Component {
       shortWinnerVol: 0,
       longLoserVol: 0,
       shortLoserVol: 0,
-      baseUri: "localhost"
+      baseUri: "localhost",
+      liquidationsDepth: 0.1,
+      liquidations: {
+        long: [],
+        short: []
+      }
     }
   }
   buildSentiment() {
@@ -48,6 +54,44 @@ class App extends React.Component {
       if(pos.position.openVolume < 0) shortLoserVol += Math.abs(pos.position.openVolume)
     });
     this.setState({ longPositionVol, shortPositionVol, longWinnerVol, shortWinnerVol, longLoserVol, shortLoserVol });
+  }
+  fetchLiquidations() {
+    const activeMarket = this.state.markets.filter(market => market.active)[0];
+    fetch("http://" + this.state.baseUri + ":5000/liquidations?market_name=" + activeMarket.name + "&depth=" + this.state.liquidationsDepth)
+      .then(res => res.json())
+      .then(
+        (result) => {
+          const longLiquidations = [];
+          const shortLiquidations = [];
+          this.setState({liquidations: {
+            "long": [],
+            "short": []
+          }});
+          result["long"].forEach((item, idx) => {
+            longLiquidations.push({
+              // id: idx.toString(),
+              y: item["openVolume"],
+              x: Number((item["liquidationLevel"] / (10 ** result["decimals"])).toFixed(5))
+            });
+          });
+          result["short"].forEach((item, idx) => {
+            shortLiquidations.push({
+              // id: idx.toString(),
+              y: item["openVolume"],
+              x: Number((item["liquidationLevel"] / (10 ** result["decimals"])).toFixed(5))
+            });
+          });
+          const liquidations = {
+            "long": longLiquidations,
+            "short": shortLiquidations
+          }
+          console.log(liquidations)
+          this.setState({liquidations: liquidations});
+        },
+        (error) => {
+          console.error(error);
+        }
+      );
   }
   fetchLeaderboard() {
     const activeMarket = this.state.markets.filter(market => market.active)[0];
@@ -133,6 +177,7 @@ class App extends React.Component {
             result[0].active = true;
             this.setState({markets: result}, () => {
               this.fetchLeaderboard();
+              this.fetchLiquidations();
               this.fetchLoserboard();
               this.fetchOpenPositions();
             });
@@ -142,6 +187,7 @@ class App extends React.Component {
           }
         );
     } else {
+      this.fetchLiquidations();
       this.fetchLeaderboard();
       this.fetchLoserboard();
       this.fetchOpenPositions();
@@ -159,6 +205,7 @@ class App extends React.Component {
       if(market.name === name) market.active = true;
     });
     this.setState({ markets: this.state.markets }, () => {
+      this.fetchLiquidations();
       this.fetchLeaderboard();
       this.fetchLoserboard();
       this.fetchOpenPositions();
@@ -267,11 +314,17 @@ class App extends React.Component {
            this.renderTableWithSentiment(this.state.longPositionVol, this.state.shortPositionVol, this.state.openPositions, 'Largest Positions')
          ) : this.state.tableType === "Loserboard" ? (
            this.renderTableWithSentiment(this.state.longLoserVol, this.state.shortLoserVol, this.state.loserboard, 'Biggest Losers')
-         ) : (
+         ) : this.state.liquidations.long.length > 0 ? (
            <div>
             <h2>Liquidation Clusters</h2>
+            <XYPlot margin={{left: 125}} width={820} height={500} stackBy="y">
+              <AreaSeries data={this.state.liquidations.short} color='#4aa165'/>
+              <AreaSeries data={this.state.liquidations.long} color='#d16547'/>
+              <XAxis tickTotal={8} />
+              <YAxis />
+            </XYPlot>
            </div>
-         )}
+         ) : null}
         </div>
       </div>
     );

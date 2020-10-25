@@ -27,11 +27,23 @@ query = '''
 query {
   parties {
     id
+    accounts {
+      balance
+      asset {
+        id
+        name
+        symbol
+      }
+      type
+    }
     positions {
       market {
         name
         id
         decimalPlaces
+        data {
+          markPrice
+        }
       }
       openVolume
       realisedPNL
@@ -86,7 +98,6 @@ def update_parties():
                 except:
                     print('Error whilst writing to mongo')
         else:
-            # TODO - don't need to store in influx more often than once per minute
             this_minute = datetime.datetime.now().minute
             if not last_influx_updates.get(party["id"]) or last_influx_updates.get(party["id"]) != this_minute:
                 try:
