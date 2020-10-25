@@ -113,3 +113,11 @@ td a:hover {
   0% { background-color: #d16547; font-weight: 600; color: #ffffff; }
   40% { background-color: none; font-weight: 400; color: #ffffff; }
 }
+
+.icons a, .icons a:hover, .icons a:active, .icons a:visited {
+  text-decoration: none;
+}
+
+.icons span {
+  cursor: pointer;
+}

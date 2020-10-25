@@ -10,11 +10,19 @@ import {
 } from 'react-vis';
 import ReactTooltip from 'react-tooltip';
 import loading from './loading.gif';
+import _ from 'lodash';
 
 class App extends React.Component {
   constructor(props) {
     super(props);
+    const params = props.match.params;
+    const market = params.market || "ETHUSD";
+    const tab = params.tab || "whales";
+    const depth = params.depth || "10";
     this.state = {
+      market: market,
+      tab: tab,
+      depth: depth,
       markets: [],
       openPositions: [],
       leaderboard: [],
@@ -83,7 +91,6 @@ class App extends React.Component {
             "long": longLiquidations,
             "short": shortLiquidations
           }
-          console.log(liquidations)
           this.setState({liquidations: liquidations});
         },
         (error) => {
@@ -172,7 +179,11 @@ class App extends React.Component {
         .then(res => res.json())
         .then(
           (result) => {
-            result[0].active = true;
+            result.forEach(market => {
+              if(_.includes(market.name, this.state.market)) {
+                market.active = true;
+              }
+            });
             this.setState({markets: result}, () => {
               this.fetchLeaderboard();
               this.fetchLiquidations();
@@ -196,18 +207,6 @@ class App extends React.Component {
   }
   componentWillUnmount() {
     this.timer = null;
-  }
-  selectMarket(name) {
-    this.state.markets.forEach(market => {
-      if(market.name !== name) market.active = false;
-      if(market.name === name) market.active = true;
-    });
-    this.setState({ markets: this.state.markets }, () => {
-      this.fetchLiquidations();
-      this.fetchLeaderboard();
-      this.fetchLoserboard();
-      this.fetchOpenPositions();
-    });
   }
   onChangeTableType(event) {
     this.setState({tableType: event.target.value});
@@ -253,7 +252,7 @@ class App extends React.Component {
                 const PNL = title === "Largest Positions" ? unrealisedPNL : totalPNL;
                 return (
                   <tr>
-                    <td><a href={"/party/"+party.partyId} target="_blank" rel="noopener noreferrer">{party.partyId}</a></td>
+                    <td><a href={"/party/"+party.partyId} rel="noopener noreferrer">{party.partyId}</a></td>
                     <td className={"center"}>{this.renderSide(party.position.openVolume)}</td>
                     <td className={"right"}><span className={"flashable " + (party.position.openVolume > party.position.lastOpenVolume ? "flash-value-green" : party.position.openVolume < party.position.lastOpenVolume ? "flash-value-red" : "")}>{Math.abs(party.position.openVolume)}</span></td>
                     <td className={"right"}>{averageEntryPrice.toFixed(activeMarket.name==="ETHUSD/DEC20" ? 2 : 4)}</td>
@@ -287,42 +286,42 @@ class App extends React.Component {
         <hr />
         <div className="nav">
           {this.state.markets.map(market => {
-            if(market.active) {
+            if(_.includes(market.name, this.state.market)) {
               return <span className="market-link-active">{market.name}</span>
             } else {
-              return <span className="market-link" onClick={() => this.selectMarket(market.name)}>{market.name}</span>;
+              return <span className="market-link"><a href={"/home/"+market.name.split("/")[0]+"/"+this.state.tab}>{market.name}</a></span>;
             }
           })}
         </div>
-        <div onChange={this.onChangeTableType.bind(this)}>
-          <span data-tip="View the 25 largest open positions">
-            <input type="radio" checked={this.state.tableType==="OpenPositions"} name="table-type" value="OpenPositions" id="whale-type" />&nbsp;
+        <div class="icons">
+          <span onClick={() => window.top.location = "/home/"+this.state.market+"/whales"} data-tip="View the 25 largest open positions">
+            <input type="radio" checked={this.state.tab==="whales"} name="table-type" value="OpenPositions" id="whale-type" />&nbsp;
             <label htmlFor="whale-type"><i style={{marginTop:-8+'px'}} className="em em-whale" aria-label=""></i></label>&nbsp;&nbsp;&nbsp;
           </span>
-          <span data-tip="View top 25 traders by PNL">
-            <input type="radio" checked={this.state.tableType==="Leaderboard"} name="table-type" value="Leaderboard" id="moneybag-type" />&nbsp;
+          <span onClick={() => window.top.location = "/home/"+this.state.market+"/winners"} data-tip="View top 25 traders by PNL">
+            <input type="radio" checked={this.state.tab==="winners"} name="table-type" value="Leaderboard" id="moneybag-type" />&nbsp;
             <label htmlFor="moneybag-type"><i style={{marginTop:-8+'px'}} className="em em-moneybag" aria-label=""></i></label>&nbsp;&nbsp;&nbsp;
           </span>
-          <span data-tip="View the worst 25 traders by PNL">
-            <input type="radio" checked={this.state.tableType==="Loserboard"} name="table-type" value="Loserboard" id="sweat-type" />&nbsp;
+          <span onClick={() => window.top.location = "/home/"+this.state.market+"/losers"} data-tip="View the worst 25 traders by PNL">
+            <input type="radio" checked={this.state.tab==="losers"} name="table-type" value="Loserboard" id="sweat-type" />&nbsp;
             <label htmlFor="sweat-type"><i style={{marginTop:-8+'px'}} className="em em-sweat" aria-label=""></i></label>&nbsp;&nbsp;&nbsp;
           </span>
-          <span data-tip="View clusters of liquidations">
-            <input type="radio" checked={this.state.tableType==="Liquidations"} name="table-type" value="Liquidations" id="warning-type" />&nbsp;
+          <span onClick={() => window.top.location = "/home/"+this.state.market+"/liquidations"} data-tip="View clusters of liquidations">
+            <input type="radio" checked={this.state.tab==="liquidations"} name="table-type" value="Liquidations" id="warning-type" />&nbsp;
             <label htmlFor="warning-type"><i style={{marginTop:-8+'px'}} className="em em-warning" aria-label=""></i></label>
           </span>
         </div>
         <div className="table-holder">
-         {this.state.tableType === "Leaderboard" ? (
+         {this.state.tab === "winners" ? (
            this.renderTableWithSentiment(this.state.longWinnerVol, this.state.shortWinnerVol, this.state.leaderboard, 'Biggest Winners')
-         ) : this.state.tableType === "OpenPositions" ? (
+         ) : this.state.tab === "whales" ? (
            this.renderTableWithSentiment(this.state.longPositionVol, this.state.shortPositionVol, this.state.openPositions, 'Largest Positions')
-         ) : this.state.tableType === "Loserboard" ? (
+         ) : this.state.tab === "losers" ? (
            this.renderTableWithSentiment(this.state.longLoserVol, this.state.shortLoserVol, this.state.loserboard, 'Biggest Losers')
          ) : (
            <div>
             <h2>Liquidations</h2>
-            <div onChange={this.onChangeLiqDepth.bind(this)} style={{marginBottom:20+"px"}}>
+            <div style={{marginBottom:20+"px"}} onChange={this.onChangeLiqDepth.bind(this)}>
               <strong>Depth:</strong>&nbsp;&nbsp;
               <input type="radio" checked={this.state.liquidationsDepth===0.01} name="liq-depth" value="0.01" id="liq_0_01" />&nbsp;
               <label style={{cursor:"pointer"}} htmlFor="liq_0_01">1%</label>&nbsp;&nbsp;&nbsp;
