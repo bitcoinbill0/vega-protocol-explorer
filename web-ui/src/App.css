@@ -91,20 +91,25 @@ td a:hover {
   text-decoration: none;
 }
 
+.flashable {
+  padding:3px 5px;
+  border-radius: 3px;
+}
+
 .flash-value-green {
-  animation: color-change-green 3s;
+  animation: color-change-green ease 1s;
 }
 
 .flash-value-red {
-  animation: color-change-red 3s;
+  animation: color-change-red ease 1s;
 }
 
 @keyframes color-change-green {
-  0% { color: #4aa165; font-weight: 600;}
-  100% { color: #000000; font-weight: 400; }
+  0% { background-color: #4aa165; font-weight: 600; color: #ffffff; }
+  40% { background-color: none; font-weight: 400; color: #ffffff; }
 }
 
 @keyframes color-change-red {
-  0% { color: #d16547; font-weight: 600; }
-  100% { color: #000000; font-weight: 400; }
+  0% { background-color: #d16547; font-weight: 600; color: #ffffff; }
+  40% { background-color: none; font-weight: 400; color: #ffffff; }
 }

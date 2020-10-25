@@ -3,8 +3,39 @@ from flask import Flask
 from flask import jsonify
 from flask import request
 import pymongo
+import requests
 import os
 import time
+import json
+from influxdb import InfluxDBClient
+
+GQ_URL = os.environ['GQ_URL']
+
+orders_query = '''
+query {
+  party(id: "PARTY_ID") {
+    orders(skip: 0, first: 0, last: 50) {
+      id
+      price
+      status
+      size
+      side
+      market {
+        decimalPlaces
+        id
+      }
+      createdAt
+      updatedAt
+      type
+    }
+  }
+}
+'''
+
+def get_orders_body(party_id):
+    return {
+      'query': orders_query.replace("PARTY_ID", party_id)
+    }
 
 time.sleep(5)
 
@@ -12,6 +43,10 @@ app = Flask(__name__)
 
 INFLUX_HOST = os.environ['INFLUX_HOST']
 MONGO_HOST = os.environ['MONGO_HOST']
+
+influxdb_client = InfluxDBClient(host=INFLUX_HOST, port=8086)
+influxdb_client.create_database('vega_history')
+influxdb_client.switch_database('vega_history')
 
 @app.after_request
 def after_request(response):
@@ -189,6 +224,31 @@ def get_liqs():
 @app.route('/markets', methods=['GET'])
 def get_markets():
     return jsonify(get_markets_arr())
+
+
+@app.route('/party', methods=['GET'])
+def get_party():
+    party = {}
+    party_id = request.args.get("party_id")
+    if not party_id:
+        return jsonify(party)
+    data = list(influxdb_client.query('SELECT * FROM "' + party_id + '" WHERE time > now() - 1d'))[0]
+    for item in data:
+        item["party"] = json.loads(item["party"])
+        item["party"]["positions"][0]["openVolume"] = int(item["party"]["positions"][0]["openVolume"])
+        item["party"]["positions"][0]["averageEntryPrice"] = int(item["party"]["positions"][0]["averageEntryPrice"])
+        item["party"]["positions"][0]["realisedPNL"] = int(item["party"]["positions"][0]["realisedPNL"])
+        item["party"]["positions"][0]["unrealisedPNL"] = int(item["party"]["positions"][0]["unrealisedPNL"])
+    result = {
+        'history': data
+    }
+    try:
+        response = requests.post(GQ_URL, json=get_orders_body(party_id))
+        orders = response.json()["data"]["party"]["orders"]
+        result["orders"] = orders
+    except:
+        print('Error calling Vega API')
+    return jsonify(result)
 
 
 @app.route('/parties', methods=['GET'])

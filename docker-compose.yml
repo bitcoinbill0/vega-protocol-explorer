@@ -5,6 +5,7 @@ services:
     environment:
       - INFLUX_HOST=influxdb
       - MONGO_HOST=mongo
+      - GQ_URL=${GQ_URL}
     ports:
       - "5000:5000"
     depends_on:

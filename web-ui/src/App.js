@@ -4,12 +4,12 @@ import {
   XYPlot,
   XAxis,
   YAxis,
-  VerticalGridLines,
   AreaSeries,
-  HorizontalGridLines,
+  ChartLabel,
   HorizontalBarSeries
 } from 'react-vis';
 import ReactTooltip from 'react-tooltip';
+import loading from './loading.gif';
 
 class App extends React.Component {
   constructor(props) {
@@ -69,14 +69,12 @@ class App extends React.Component {
           }});
           result["long"].forEach((item, idx) => {
             longLiquidations.push({
-              // id: idx.toString(),
               y: item["openVolume"],
               x: Number((item["liquidationLevel"] / (10 ** result["decimals"])).toFixed(5))
             });
           });
           result["short"].forEach((item, idx) => {
             shortLiquidations.push({
-              // id: idx.toString(),
               y: item["openVolume"],
               x: Number((item["liquidationLevel"] / (10 ** result["decimals"])).toFixed(5))
             });
@@ -214,57 +212,64 @@ class App extends React.Component {
   onChangeTableType(event) {
     this.setState({tableType: event.target.value});
   }
+  onChangeLiqDepth(event) {
+    this.setState({liquidationsDepth: parseFloat(event.target.value)});
+  }
   renderTableWithSentiment(longVol, shortVol, data, title) {
-    return (
-      <div>
-        <h2>Current Sentiment</h2>
-        <XYPlot width={900} height={160} margin={{bottom: 80, left: 60, right: 10, top: 20}}  stackBy="x" yType="ordinal">
-          <VerticalGridLines />
-          <HorizontalGridLines />
-          <XAxis tickTotal={5} tickFormat={v => {
-            if (v >= 1000000) {
-              return `${v/1000000}M`
-            } else if (v >= 1000) {
-              return `${v/1000}K`
-            }
-            return `${v}`
-          }} />
-          <YAxis />
-          <HorizontalBarSeries data={[{x: Math.round(longVol), y: 'Long'}]} color='#4aa165' />
-          <HorizontalBarSeries data={[{x: Math.round(shortVol), y: 'Short'}]} color='#d16547' />
-        </XYPlot>
-        <h2>{title}</h2>
-        <table width="100%" cellSpacing="0" cellPadding="0" border="0">
-          <thead>
-            <tr>
-              <td>Party</td>
-              <td className="center">Side</td>
-              <td className="right">Size</td>
-              <td className="right">Entry</td>
-              <td className="right">Net PNL</td>
-            </tr>
-          </thead>
-          <tbody>
-            {data.map(party => {
-              const averageEntryPrice = (party.position.averageEntryPrice) / (10 ** party.position.margins[0].asset.decimals);
-              const unrealisedPNL = (party.position.unrealisedPNL) / (10 ** party.position.margins[0].asset.decimals);
-              const totalPNL = (party.position.totalPNL) / (10 ** party.position.margins[0].asset.decimals);
-              const activeMarket = this.state.markets.filter(market => market.active)[0];
-              const PNL = title === "Largest Positions" ? unrealisedPNL : totalPNL;
-              return (
-                <tr>
-                  <td><a href={"/party/"+party.partyId} target="_blank" rel="noopener noreferrer">{party.partyId}</a></td>
-                  <td className={"center"}>{this.renderSide(party.position.openVolume)}</td>
-                  <td className={"right " + (party.position.openVolume > party.position.lastOpenVolume ? "flash-value-green" : party.position.openVolume < party.position.lastOpenVolume ? "flash-value-red" : "")}>{Math.abs(party.position.openVolume)}</td>
-                  <td className={"right"}>{averageEntryPrice.toFixed(activeMarket.name==="ETHUSD/DEC20" ? 2 : 4)}</td>
-                  <td className={"right " + (party.position.totalPNL > party.position.lastTotalPNL ? "flash-value-green" : party.position.totalPNL < party.position.lastTotalPNL ? "flash-value-red" : "")}>{PNL.toFixed(2)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    );
+    if(data.length > 0) {
+      return (
+        <div>
+          <h2>Current Sentiment</h2>
+          <XYPlot width={900} height={160} margin={{bottom: 80, left: 60, right: 10, top: 20}}  stackBy="x" yType="ordinal">
+            <XAxis tickTotal={5} tickFormat={v => {
+              if (v >= 1000000) {
+                return `${v/1000000}M`
+              } else if (v >= 1000) {
+                return `${v/1000}K`
+              }
+              return `${v}`
+            }} />
+            <YAxis />
+            <HorizontalBarSeries data={[{x: Math.round(longVol), y: 'Long'}]} color='#4aa165' />
+            <HorizontalBarSeries data={[{x: Math.round(shortVol), y: 'Short'}]} color='#d16547' />
+          </XYPlot>
+          <h2>{title}</h2>
+          <table width="100%" cellSpacing="0" cellPadding="0" border="0">
+            <thead>
+              <tr>
+                <td>Party</td>
+                <td className="center">Side</td>
+                <td className="right">Size</td>
+                <td className="right">Entry</td>
+                <td className="right">Net PNL</td>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map(party => {
+                const averageEntryPrice = (party.position.averageEntryPrice) / (10 ** party.position.margins[0].asset.decimals);
+                const unrealisedPNL = (party.position.unrealisedPNL) / (10 ** party.position.margins[0].asset.decimals);
+                const totalPNL = (party.position.totalPNL) / (10 ** party.position.margins[0].asset.decimals);
+                const activeMarket = this.state.markets.filter(market => market.active)[0];
+                const PNL = title === "Largest Positions" ? unrealisedPNL : totalPNL;
+                return (
+                  <tr>
+                    <td><a href={"/party/"+party.partyId} target="_blank" rel="noopener noreferrer">{party.partyId}</a></td>
+                    <td className={"center"}>{this.renderSide(party.position.openVolume)}</td>
+                    <td className={"right"}><span className={"flashable " + (party.position.openVolume > party.position.lastOpenVolume ? "flash-value-green" : party.position.openVolume < party.position.lastOpenVolume ? "flash-value-red" : "")}>{Math.abs(party.position.openVolume)}</span></td>
+                    <td className={"right"}>{averageEntryPrice.toFixed(activeMarket.name==="ETHUSD/DEC20" ? 2 : 4)}</td>
+                    <td className={"right"}><span className={"flashable " + (party.position.totalPNL > party.position.lastTotalPNL ? "flash-value-green" : party.position.totalPNL < party.position.lastTotalPNL ? "flash-value-red" : "")}>{PNL.toFixed(2)}</span></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      );
+    } else {
+      return (
+        <div><img src={loading} alt="Loading..." width="42" /></div>
+      );
+    }
   }
   renderSide(vol) {
     if(vol > 0) {
@@ -314,17 +319,57 @@ class App extends React.Component {
            this.renderTableWithSentiment(this.state.longPositionVol, this.state.shortPositionVol, this.state.openPositions, 'Largest Positions')
          ) : this.state.tableType === "Loserboard" ? (
            this.renderTableWithSentiment(this.state.longLoserVol, this.state.shortLoserVol, this.state.loserboard, 'Biggest Losers')
-         ) : this.state.liquidations.long.length > 0 ? (
+         ) : (
            <div>
-            <h2>Liquidation Clusters</h2>
-            <XYPlot margin={{left: 125}} width={820} height={500} stackBy="y">
-              <AreaSeries data={this.state.liquidations.short} color='#4aa165'/>
-              <AreaSeries data={this.state.liquidations.long} color='#d16547'/>
-              <XAxis tickTotal={8} />
-              <YAxis />
-            </XYPlot>
+            <h2>Liquidations</h2>
+            <div onChange={this.onChangeLiqDepth.bind(this)} style={{marginBottom:20+"px"}}>
+              <strong>Depth:</strong>&nbsp;&nbsp;
+              <input type="radio" checked={this.state.liquidationsDepth===0.01} name="liq-depth" value="0.01" id="liq_0_01" />&nbsp;
+              <label style={{cursor:"pointer"}} htmlFor="liq_0_01">1%</label>&nbsp;&nbsp;&nbsp;
+              <input type="radio" checked={this.state.liquidationsDepth===0.03} name="liq-depth" value="0.03" id="liq_0_03" />&nbsp;
+              <label style={{cursor:"pointer"}} htmlFor="liq_0_03">3%</label>&nbsp;&nbsp;&nbsp;
+              <input type="radio" checked={this.state.liquidationsDepth===0.05} name="liq-depth" value="0.05" id="liq_0_05" />&nbsp;
+              <label style={{cursor:"pointer"}} htmlFor="liq_0_05">5%</label>&nbsp;&nbsp;&nbsp;
+              <input type="radio" checked={this.state.liquidationsDepth===0.1} name="liq-depth" value="0.1" id="liq_0_1" />&nbsp;
+              <label style={{cursor:"pointer"}} htmlFor="liq_0_1">10%</label>&nbsp;&nbsp;&nbsp;
+              <input type="radio" checked={this.state.liquidationsDepth===0.2} name="liq-depth" value="0.2" id="liq_0_2" />&nbsp;
+              <label style={{cursor:"pointer"}} htmlFor="liq_0_2">20%</label>&nbsp;&nbsp;&nbsp;
+              <input type="radio" checked={this.state.liquidationsDepth===0.5} name="liq-depth" value="0.5" id="liq_0_5" />&nbsp;
+              <label style={{cursor:"pointer"}} htmlFor="liq_0_5">50%</label>&nbsp;&nbsp;&nbsp;
+            </div>
+            {
+              this.state.liquidations.long.length > 0 ? (
+                <XYPlot margin={{left: 125, bottom: 80}} width={820} height={500} stackBy="y">
+                  <AreaSeries data={this.state.liquidations.short} color='#4aa165'/>
+                  <AreaSeries data={this.state.liquidations.long} color='#d16547'/>
+                  <XAxis tickTotal={8} />
+                  <YAxis />
+                  <ChartLabel
+                    text="Price"
+                    className="alt-x-label"
+                    includeMargin={false}
+                    xPercent={0.475}
+                    yPercent={1.15}
+                    />
+                  <ChartLabel
+                    text="Cumulative Volume"
+                    className="alt-y-label"
+                    includeMargin={false}
+                    xPercent={-0.15}
+                    yPercent={0.06}
+                    style={{
+                      transform: 'rotate(-90)',
+                      textAnchor: 'end'
+                    }}
+                    />
+                </XYPlot>
+              ) :
+              <div>
+                <em>There are no liquidations to display for the selected market and depth.</em>
+              </div>
+            }
            </div>
-         ) : null}
+         )}
         </div>
       </div>
     );
